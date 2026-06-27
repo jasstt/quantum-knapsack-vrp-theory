@@ -271,18 +271,17 @@ $$\mathcal{A} = \{\text{problems where LP boundary zone} = O(1)\}$$
 $$\mathcal{B} = \{\text{problems where QUBO encoding} = O(n)\}$$
 $$\mathcal{C} = \{\text{problems where LP + rounding achieves } (1-\varepsilon)\text{-approximation}\}$$
 
-**Conjecture:** $\mathcal{A} \subseteq \mathcal{B}$ and $\mathcal{A} \subseteq \mathcal{C}$, with equality for "natural" problem classes (Knapsack, single-constraint packing problems).
+**Conjecture:** $\mathcal{A} \subseteq \mathcal{B}$, $\mathcal{A} \subseteq \mathcal{C}$, **and** $\mathcal{B} \cap \mathcal{C} \subseteq \mathcal{A}$, with equality for "natural" problem classes.
 
 *Informally:* "The problems where quantum sub-problems are small enough to
 be tractable are exactly the problems where classical LP already works well."
 
-### 3.2 Why This Is Structural, Not Coincidental
+### 3.2 The A⊆B and A⊆C Directions
 
 The relationship follows from the **LP integrality gap** and
 **total dual integrality (TDI)**.
 
-**[PROVEN — Schrijver, "Theory of Linear and Integer Programming", 1986,
-Ch. 22]**
+**[PROVEN — Schrijver, "Theory of Linear and Integer Programming", 1986, Ch. 22]**
 
 A system $Ax \leq b$ is **Totally Dual Integral (TDI)** if for every integer
 objective $c$, the LP dual has an integer optimal solution whenever it is bounded.
@@ -291,28 +290,96 @@ objective $c$, the LP dual has an integer optimal solution whenever it is bounde
 relaxation has an integer optimal solution — the **integrality gap is 1**.
 
 **[PROVEN]** A sufficient condition for TDI: the constraint matrix $A$ is
-**totally unimodular (TU)** — every square sub-matrix has determinant $\in
-\{-1, 0, +1\}$.
+**totally unimodular (TU)** — every square sub-matrix has determinant $\in \{-1, 0, +1\}$.
 
 TU matrix examples:
-- Network flow matrices (source-sink): TU → LP has integer solutions → no subtour needed in VRP if single-commodity
+- Network flow matrices: TU → LP has integer solutions
 - Interval matrices: TU
 - Arbitrary knapsack weights: **NOT TU** (but special structure limits fractionality to 1 variable)
 
-**The structural argument:**
+**The A⊆B structural argument:**
 
 $$\text{Small LP boundary} \xLeftrightarrow{\text{structural}} \text{LP relaxation near-integral} \xLeftrightarrow{\text{theory}} \text{small integrality gap}$$
 
-$$\text{Small integrality gap} \implies \text{LP + rounding works classically}$$
+$$\text{Small LP boundary} \implies \text{QUBO only encodes boundary} \implies O(1) \text{ extra variables}$$
 
-$$\text{Small LP boundary} \implies \text{QUBO only encodes boundary} \implies O(1) \text{ variables}$$
+$$\therefore \mathcal{A} \subseteq \mathcal{B} \quad \text{[CONJECTURE for natural problem classes]}$$
 
-$$O(1) \text{ QUBO variables} \implies \text{trivially solvable} \implies \text{no quantum advantage needed}$$
+**The A⊆C structural argument:**
 
-The circularity: problems where the quantum sub-problem is tiny are
-precisely those where the classical sub-problem is also tiny.
+$$\text{Small integrality gap} \implies \text{LP + rounding achieves } (1-\varepsilon)\text{-approximation}$$
 
-### 3.3 Counter-Direction: Large Gap → Large QUBO
+For Knapsack this is the FPTAS argument **[Vazirani, "Approximation Algorithms", Ch. 8; PROVEN]**.
+
+$$\therefore \mathcal{A} \subseteq \mathcal{C} \quad \text{[PROVEN for Knapsack, CONJECTURE for general natural classes]}$$
+
+### 3.3 The Reverse Direction: B∩C⊆A
+
+This is the *hardest* direction and is stated here as an **open conjecture**.
+
+**[OPEN PROBLEM — The B∩C⊆A direction]**
+
+Claim: If a problem has $O(n)$ QUBO encoding **and** LP + rounding works well,
+then its LP relaxation boundary zone must be $O(1)$.
+
+**Informal argument (not a proof):**
+
+Suppose a problem $P \in \mathcal{B} \cap \mathcal{C}$:
+- $P \in \mathcal{B}$: QUBO has $O(n)$ variables. The penalty terms in
+  $H = -f(x) + \lambda \sum_k P_k(x)^2$ must encode all constraints with
+  $O(n)$ binary variables total. If each penalty $P_k$ involves $O(n)$
+  variables, the QUBO has $O(n^2)$ cross-terms — but the *variable count*
+  stays $O(n)$ only if constraints have $O(1)$ support each (i.e., each
+  constraint involves $O(1)$ variables).
+- $P \in \mathcal{C}$: LP + rounding achieves $(1-\varepsilon)$-approximation.
+  By the standard LP rounding analysis, this requires the **LP integrality gap**
+  to be bounded: $\text{gap} \leq 1/(1-\varepsilon)$.
+- A bounded integrality gap implies that the LP optimal face has **bounded dimension**
+  relative to $n$ — specifically, the number of fractional variables at any
+  LP optimum is bounded **[Hoffman-Kruskal theorem, see Schrijver 1986 Ch. 19]**.
+- Bounded fractional variables = bounded LP boundary zone ⟹ $P \in \mathcal{A}$.
+
+**Where the argument breaks down:**
+
+The step "bounded integrality gap → bounded LP optimal face dimension" is
+*not* a proven theorem in general. It holds for TU constraint matrices
+(where the gap is exactly 1 and all vertices are integral) and for
+specific structured problems (Knapsack, network flows). For general
+$\{0,1\}$-programs with bounded gap, the LP vertex can still have
+$\Omega(n)$ fractional variables.
+
+**Three routes to a formal proof (for future work):**
+
+1. **TDI + Hoffman-Kruskal route:** If $Ax \leq b$ is TDI with sparse $A$
+   (each row has $O(1)$ non-zeros), then the LP optimal face is a bounded
+   polyhedron with integral vertices. This implies bounded boundary zone.
+   *Gap:* Sparsity of $A$ must be related to $O(n)$ QUBO encoding — this
+   connection is plausible but not formalised.
+   **[Relevant: Hoffman-Kruskal (1956), Schrijver (1986) Ch. 19]**
+
+2. **Communication complexity route:** Encode $\mathcal{B} \cap \mathcal{C}$
+   membership as a two-party communication problem. Use Yao's minimax principle
+   to show that $O(n)$ QUBO encoding implies $O(n)$-bit certificates for
+   constraint satisfaction, which limits the boundary zone.
+   *Gap:* The reduction from QUBO variable count to communication bits
+   requires formalising what "QUBO encodes the problem" means precisely.
+   **[Relevant: Yao (1979), Kushilevitz-Nisan "Communication Complexity" Ch. 1]**
+
+3. **Constraint graph sparsity route:** If the constraint graph $G_P$
+   (nodes = variables, edges = pairs appearing in constraints) is sparse
+   ($O(n)$ edges), then the LP feasible region has bounded treewidth,
+   which limits the number of fractional variables at any vertex.
+   *Gap:* Treewidth $\leq k$ implies bounded fractionality only for
+   $k = O(1)$ — the connection to $O(n)$ QUBO encoding needs work.
+   **[Relevant: Bodlaender (1993), Cygan et al. "Parameterized Algorithms" Ch. 7]**
+
+**Verdict:** $\mathcal{B} \cap \mathcal{C} \subseteq \mathcal{A}$ is a
+well-motivated conjecture with three plausible proof routes, but remains
+an **open problem**. Proving it would formally close the circularity and
+constitute a significant theoretical result connecting LP theory, QUBO
+encoding, and quantum advantage boundaries.
+
+### 3.4 Counter-Direction: Large Gap → Large QUBO
 
 For routing problems (TSP, VRP): the LP relaxation has an integrality gap
 of $O(\log n)$ (best known for CVRP) to $O(1)$ (TSP, Christofides 1.5-approx).
@@ -461,15 +528,56 @@ For $n=20$: $q = 20 \times 4.3 \approx 86$ logical; physical: $86 \times 449 = 3
 Still not NISQ-feasible for $d=15$, but approaching the $O(10^3)$ physical qubit range
 of near-term hardware.
 
-**Theoretical barrier:** Subtour elimination constraints number $2^n - 2$.
-Any QUBO encoding must represent these constraints. A counting argument
-suggests $\Omega(n \log n)$ bits are needed to distinguish all $2^n$
-sub-tours — making $O(n \log n)$ a theoretical lower bound for any
-binary encoding of TSP/VRP subtour constraints.
+**Assessment of C5 — Subtour Encoding Lower Bound:**
 
-**[CONJECTURE C5]** The minimum QUBO encoding of VRP/TSP is
-$\Omega(n \log n)$ bits for the subtour elimination constraints alone,
-making $O(n^2)$ achievable today and $O(n \log n)$ a theoretical target.
+The original document stated a "counting argument suggests $\Omega(n \log n)$"
+lower bound. This requires careful scrutiny — the counting argument alone is **insufficient**.
+
+**Why the simple counting argument gives only $\Omega(n)$, not $\Omega(n \log n)$:**
+
+There are $2^n - 2$ proper non-empty subsets $S \subset V$ whose subtour elimination
+cutsets must be enforced. Distinguishing $2^n$ subsets requires $\Omega(n)$ bits
+(since $\log_2(2^n) = n$). This yields an $\Omega(n)$ lower bound on the encoding — **not**
+$\Omega(n \log n)$.
+
+**The stronger $\Omega(n \log n)$ argument — via permutation entropy:**
+
+A TSP optimal tour is a permutation $\pi \in S_n$ of $n$ cities. There are $n!$
+distinct permutations. Any binary encoding that distinguishes all valid tours must
+use at least $\lceil \log_2(n!) \rceil$ bits. By Stirling's approximation:
+
+$$\lceil \log_2(n!) \rceil = \Theta(n \log n)$$
+
+This is an **information-theoretic argument**: to uniquely specify which of the $n!$
+tours is optimal, any encoding needs $\Omega(n \log n)$ bits.
+
+**Important caveat:** This argument bounds the encoding of the *solution*, not the
+encoding of the *problem constraints*. The QUBO encodes constraints (arc variables $x_{ij}$),
+not the solution directly. The connection between constraint encoding bits and solution
+encoding bits requires an additional step:
+
+> If the QUBO constraint system must be expressive enough to have exactly the valid TSP tours
+> as its feasible solutions, and there are $n!$ such tours, then any binary matrix over
+> $\{0,1\}^q$ with $q$ variables must have at least $n!$ feasible points matching tours
+> — requiring $q = \Omega(n \log n)$. **[INFORMAL PROOF SKETCH — not a formal theorem]**
+
+This sketch is plausible but has a gap: the QUBO feasible set need not correspond bijectively
+to tours. Multiple QUBO assignments can map to the same tour, and penalty terms can exclude
+infeasible assignments without enumerating all subtours explicitly.
+
+**[CONJECTURE C5 — REVISED STATUS: OPEN PROBLEM]**
+
+The minimum QUBO variable count for any encoding of TSP/VRP subtour constraints is:
+
+$$q_{\min} = \Omega(n \log n)$$
+
+The $n!$ permutation entropy argument provides the strongest informal support.
+A formal proof would require connecting information-theoretic lower bounds on
+solution encoding to lower bounds on constraint encoding — a gap that currently
+remains open in the literature.
+
+*The $O(n^2)$ current encoding is achievable; the $\Omega(n \log n)$ theoretical
+target is conjectured but not proven.*
 
 ### 5.3 The Bug-Lessons as Theoretical Signals
 
@@ -550,18 +658,55 @@ mixer that only transitions between feasible routes — an open research problem
 
 ---
 
+## 7. Related Work
+
+### Bravyi, Kliesch, Koenig, Tang (2022) — Hybrid Algorithms for Graph Colouring
+
+**Citation:** Bravyi, S., Kliesch, A., Koenig, R., & Tang, E. (2022). "Hybrid quantum-classical algorithms for approximate graph coloring." *Quantum* 6, 678. (Preprint: arXiv:2011.13420)
+
+This paper analyses Recursive QAOA (RQAOA) on MAX-$k$-CUT — equivalent to approximate $k$-colouring. The key finding is that standard (non-recursive) QAOA **fails** to solve graph colouring for most regular bipartite graphs at any constant depth $p$, achieving approximation ratios no better than random colouring. The authors further construct an efficient classical simulation of level-1 QAOA, showing that at this depth the hybrid algorithm offers no quantum advantage.
+
+**Relation to this work:** Graph Colouring has $O(nk)$ QUBO encoding (Section 1.2g), placing it in the super-linear class between $O(n)$ and $O(n^2)$. The Bravyi et al. (2022) result is consistent with Conjecture C1: the effective circuit operates on $nk$ qubits, so the barren plateau pressure scales as $O(2^{-nk})$, making training intractable for large $k$. Additionally, the graph colouring constraint ("each node gets exactly one colour") is a *global* constraint — violating the locality condition of C2. Bravyi et al. (2022) thus provides an empirical confirmation of *both* the encoding complexity and cost-locality conditions of the quantum advantage boundary framework.
+
+### Farhi, Gamarnik, Gutmann (2020) — QAOA Must See the Whole Graph
+
+**Citation:** Farhi, E., Gamarnik, D., & Gutmann, S. (2020). "The Quantum Approximate Optimization Algorithm Needs to See the Whole Graph: A Typical Case." arXiv:2004.09002.
+
+This paper analyses QAOA on the Maximum Independent Set problem on random $d$-regular graphs. The central result is that for depth $p < c \log n$ (for a $d$-dependent constant $c$), the QAOA cannot achieve better than approximately $0.854$ times the optimal independent set size. The mechanism is *locality*: at shallow depth, each qubit's circuit only "sees" its local $p$-hop neighbourhood, which on random regular graphs is a tree. The global structure — necessary for near-optimal solutions — is invisible.
+
+**Relation to this work:** This result is the strongest empirical evidence for the locality condition in Conjecture C2. The requirement that $p = \Omega(\log n)$ for global structure to be visible means that depth must grow with problem size — precisely the regime where barren plateaus become catastrophic (gradient variance $O(2^{-n})$ with $O(n)$ parameters). Farhi et al. (2020) and Bravyi et al. (2020) together establish that *shallow* QAOA is provably limited by locality, while *deep* QAOA is limited by barren plateaus — squeezing the window for quantum advantage from both sides.
+
+### Cerezo et al. (2021) — Cost Function Dependent Barren Plateaus
+
+**Citation:** Cerezo, M., Sone, A., Volkoff, T., Cincio, L., & Coles, P.J. (2021). "Cost function dependent barren plateaus in shallow parametrized quantum circuits." *Nature Communications* 12, 1791.
+
+This paper refines the barren plateau theory of McClean et al. (2018) by showing that the gradient decay rate depends critically on whether the cost function is *local* or *global*. For local cost functions (observable acts on $O(1)$ qubits), gradients decay at most polynomially in $n$ for shallow circuits (depth $O(\log n)$). For global cost functions (observable acts on all $n$ qubits), gradients decay exponentially even for shallow circuits.
+
+**Relation to this work:** This paper directly strengthens Conjecture C2. The three-condition framework (Section 2.3) requires locality of the cost function as an independent condition from encoding size. Cerezo et al. (2021) proves that locality is *sufficient* to avoid exponential barren plateaus in shallow circuits — but also that it is not sufficient alone: deep circuits suffer barren plateaus regardless of locality **[McClean et al. 2018]**. For VRP and Knapsack: the penalty terms $\lambda(\sum w_i x_i - W)^2$ are global observables (acting on all $n$ variables), so they suffer exponential gradient decay at any depth, even if the variable count is $O(n)$. This closes the gap in our analysis: O(n) encoding is necessary but not sufficient — locality of the cost function is the second independent requirement.
+
+---
+
 ## References
 
-- Cerezo et al. (2021). "Variational quantum algorithms." *Nature Reviews Physics* 3, 625–644.
+- Bodlaender, H.L. (1993). "A linear time algorithm for finding tree-decompositions of small treewidth." *SIAM Journal on Computing* 25(6), 1305–1317.
+- Bravyi, S., Kliesch, A., Koenig, R., & Tang, E. (2020). "Obstacles to variational quantum optimisation from symmetry protection." *Physical Review Letters* 125, 260505.
+- Bravyi, S., Kliesch, A., Koenig, R., & Tang, E. (2022). "Hybrid quantum-classical algorithms for approximate graph coloring." *Quantum* 6, 678. arXiv:2011.13420.
+- Cerezo, M., et al. (2021). "Variational quantum algorithms." *Nature Reviews Physics* 3, 625–644.
+- Cerezo, M., Sone, A., Volkoff, T., Cincio, L., & Coles, P.J. (2021). "Cost function dependent barren plateaus in shallow parametrized quantum circuits." *Nature Communications* 12, 1791.
+- Cygan, M., et al. (2015). *Parameterized Algorithms.* Springer.
 - Dantzig, G.B. (1957). "Discrete-variable extremum problems." *Operations Research* 5(2), 266–288.
-- Farhi, Goldstone, Gutmann (2014). "A Quantum Approximate Optimisation Algorithm." arXiv:1411.4028.
-- Khot, Kindler, Mossel, O'Donnell (2007). "Optimal inapproximability results for MAX-CUT." *SIAM J. Computing* 37(1), 319–357.
-- Kitaev, Shen, Vyalyi (2002). *Classical and Quantum Computation.* AMS.
-- Kellerer, Pferschy, Pisinger (2004). *Knapsack Problems.* Springer.
-- McClean, Boixo, Smelyanskiy, Babbush, Neven (2018). "Barren plateaus in quantum neural network training landscapes." *Nature Communications* 9, 4812.
-- Schrijver, A. (1986). *Theory of Linear and Integer Programming.* Wiley.
-- Bravyi, Kliesch, Koenig, Tang (2020). "Obstacles to variational quantum optimisation from symmetry protection." *Physical Review Letters* 125, 260505.
+- Farhi, E., Gamarnik, D., & Gutmann, S. (2020). "The Quantum Approximate Optimization Algorithm Needs to See the Whole Graph: A Typical Case." arXiv:2004.09002.
+- Farhi, E., Goldstone, J., & Gutmann, S. (2014). "A Quantum Approximate Optimisation Algorithm." arXiv:1411.4028.
 - Hastings, M.B. (2021). "Classical and quantum bounded depth approximation algorithms." *Quantum* 5, 382.
+- Hoffman, A.J. & Kruskal, J.B. (1956). "Integral boundary points of convex polyhedra." In Kuhn & Tucker (eds.), *Linear Inequalities and Related Systems*, pp. 223–246. Princeton University Press.
+- Kellerer, H., Pferschy, U., & Pisinger, D. (2004). *Knapsack Problems.* Springer.
+- Khot, S., Kindler, G., Mossel, E., & O'Donnell, R. (2007). "Optimal inapproximability results for MAX-CUT." *SIAM J. Computing* 37(1), 319–357.
+- Kitaev, A., Shen, A., & Vyalyi, M. (2002). *Classical and Quantum Computation.* AMS.
+- Kushilevitz, E. & Nisan, N. (1997). *Communication Complexity.* Cambridge University Press.
+- McClean, J.R., Boixo, S., Smelyanskiy, V.N., Babbush, R., & Neven, H. (2018). "Barren plateaus in quantum neural network training landscapes." *Nature Communications* 9, 4812.
+- Schrijver, A. (1986). *Theory of Linear and Integer Programming.* Wiley.
+- Vazirani, V. (2001). *Approximation Algorithms.* Springer.
+- Yao, A.C. (1979). "Some complexity questions related to distributive computing." *Proc. 11th STOC*, pp. 209–213.
 
 ---
 
