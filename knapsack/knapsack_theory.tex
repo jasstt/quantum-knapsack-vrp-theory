@@ -78,6 +78,18 @@ classes beyond those studied in this work.
 \newpage
 
 % ══════════════════════════════════════════════════════════════════════════════
+\section{Introduction}
+\label{sec:intro}
+
+The Quantum Approximate Optimization Algorithm (QAOA) generated substantial interest upon its introduction in 2014~\cite{farhi2014qaoa}. It was presented as the most promising candidate for near-term quantum advantage in combinatorial optimisation. However, over the past decade, empirical results have consistently fallen short of theoretical promises---even for MaxCut, QAOA has not surpassed the classical 0.878 approximation guarantee of the Goemans--Williamson algorithm. This study investigates the underlying reasons for this shortfall, asking the ``why'' question from a structural perspective rather than a purely algorithmic or hardware-focused one.
+
+We present two parallel contributions. Analytically, we classify seven combinatorial problem classes by deriving the growth rate of their QUBO encoding size relative to the instance size $n$, ranging from $O(n)$ to $O(n^2m)$. Empirically, we measure the barren plateau gradient variance on MaxCut QAOA circuits, verifying the $O(2^{-n})$ scaling established by McClean et al.~\cite{mcclean2018barren}. By linking these two perspectives, we investigate how the encoding size directly controls the severity of the barren plateau.
+
+We introduce the Circularity Conjecture: the combinatorial problems where quantum sub-problems are small enough to remain tractable (characterised by $O(n)$ encoding, local cost functions, and high valid solution fractions) are exactly the problems where classical linear programming and rounding techniques already work well. This coincidence constitutes a structural barrier, not a hardware limitation, suggesting it will not be resolved simply by building better quantum devices. These findings are supported by empirical data from a 20-node CVRP benchmark, which requires approximately 1.2 million physical qubits, consistent with its theoretical $O(n^2m)$ classification.
+
+The structure of this paper is as follows. Section~\ref{sec:encoding} derives the QUBO encoding complexity classes. Section~\ref{sec:barren} details the connection between encoding complexity and barren plateaus. Section~\ref{sec:circularity} formalises the Circularity Conjecture and explores potential proof directions. Section~\ref{sec:exceptions} examines candidate exceptions to this circularity, such as MaxCut and the $k$-Local Hamiltonian problem. Finally, Section~\ref{sec:vrp} interprets the VRP benchmark results in light of our theoretical framework.
+
+% ══════════════════════════════════════════════════════════════════════════════
 \section{Problem Encoding Complexity Classes}
 \label{sec:encoding}
 
@@ -443,7 +455,7 @@ $<$ 0.878. Bravyi et al.~\cite{bravyi2020obstacles} showed QAOA $p < n/2$
 cannot beat Goemans--Williamson on certain graph families.
 Farhi et al.~\cite{farhi2020typical,farhi2020worst} showed that for depth
 $p < c \log n$, the QAOA is limited by locality barriers on random
-$d$-regular graphs.
+$d$-regular graphs. We include Conjecture~\ref{conj:C4} as a candidate exception to the Circularity Conjecture; we do not prove it, and its resolution depends on the status of the Unique Games Conjecture.
 
 \subsection{Quantum Local Hamiltonian ($k$-Local Hamiltonian)}
 
@@ -481,7 +493,7 @@ $\approx 1{,}188{,}952$ physical qubits. Our theoretical prediction:
     &= 400 \times 4 + 20 \times 4 \times 5 + 4 \times 3
      = 1680 + 400 + 12 = 2092\text{ logical}
 \end{align}
-With surface code distance $d=15$: $1\text{ logical} \mapsto 2d^2-1=449$
+With surface code distance $d=15$: $1\text{ logical qubit} \rightarrow 2d^2-1=449$
 physical:
 \begin{equation}
   2092 \times 449 = 939{,}308\text{ physical}
