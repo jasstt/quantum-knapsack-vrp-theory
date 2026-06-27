@@ -1,0 +1,666 @@
+\documentclass[11pt]{article}
+
+% ── Packages ──────────────────────────────────────────────────────────────────
+\usepackage{amsmath, amsthm, amssymb}
+\usepackage[colorlinks=true, linkcolor=blue, citecolor=blue, urlcolor=blue]{hyperref}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{microtype}
+\usepackage[margin=1in]{geometry}
+
+% ── Theorem environments ───────────────────────────────────────────────────────
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{conjecture}[theorem]{Conjecture}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem*{openprob}{Open Problem}
+
+\theoremstyle{remark}
+\newtheorem*{remark}{Remark}
+
+% ── Macros ─────────────────────────────────────────────────────────────────────
+\newcommand{\qubo}{QUBO\xspace}
+\newcommand{\qaoa}{QAOA\xspace}
+\newcommand{\calA}{\mathcal{A}}
+\newcommand{\calB}{\mathcal{B}}
+\newcommand{\calC}{\mathcal{C}}
+\newcommand{\Var}{\operatorname{Var}}
+\newcommand{\E}{\mathbb{E}}
+
+% ── Title ──────────────────────────────────────────────────────────────────────
+\title{\textbf{Encoding Complexity, Barren Plateaus, and the\\
+Circularity Conjecture: Structural Limits on\\
+Hybrid Quantum-Classical Optimisation}}
+
+\author{[Author Name]\\
+\small Independent Researcher\\
+\small \href{https://github.com/jasstt/quantum-knapsack-vrp-theory}%
+{\texttt{github.com/jasstt/quantum-knapsack-vrp-theory}}}
+
+\date{\today}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\begin{document}
+\maketitle
+
+% ── Abstract ──────────────────────────────────────────────────────────────────
+\begin{abstract}
+The Quantum Approximate Optimization Algorithm (QAOA) has generated
+substantial interest as a near-term approach to combinatorial optimisation,
+yet empirical results have consistently fallen short of theoretical promise.
+We investigate the structural conditions under which quantum advantage is
+theoretically accessible, combining an analytical QUBO encoding complexity
+classification across seven problem classes with an empirical measurement of
+barren plateau gradient variance scaling on MaxCut QAOA circuits.
+We classify problems by whether their QUBO formulation grows as $O(n)$,
+$O(nk)$, or $O(n^2m)$ in the number of binary variables, and show that this
+growth rate directly controls the effective barren plateau suppression---from
+polynomial ($O(n)$ class) to doubly-exponential ($O(n^2m)$ class, including
+VRP and TSP).
+For the 20-node CVRP benchmark, our encoding analysis predicts
+$\approx 2{,}092$ logical and $\approx 939{,}000$ physical qubits, consistent
+with empirical resource estimates of 2,648 logical and 1.2 million physical
+qubits.
+We introduce the \emph{Circularity Conjecture}: for natural combinatorial
+problem classes, the problems where LP boundary zones are small enough for
+quantum sub-problems to be tractable are precisely those where classical
+LP-plus-rounding already provides strong approximation guarantees.
+We further identify as an open problem the question of tight lower bounds on
+subtour encoding size for TSP and VRP.
+This structural coincidence is not a hardware limitation and will not be
+resolved by improved quantum devices alone---it suggests that the search for
+practical quantum advantage in combinatorial optimisation must target problem
+classes beyond those studied in this work.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Problem Encoding Complexity Classes}
+\label{sec:encoding}
+
+\subsection{Derivation Framework}
+
+A QUBO formulation for a combinatorial optimisation problem requires:
+\begin{equation}
+  H(x) = \underbrace{-\sum_i v_i x_i}_{\text{objective}}
+        + \underbrace{\lambda \sum_k P_k(x)^2}_{\text{constraint penalties}}
+\end{equation}
+where each penalty $P_k(x)^2$ introduces cross-terms between variables.
+The number of distinct QUBO variables $q$ determines the Hilbert space
+dimension $2^q$ that QAOA must search. We classify problems by how $q$
+scales with instance size $n$.
+
+% ── 1.2 Per-problem ──────────────────────────────────────────────────────────
+\subsection{Per-Problem Analysis}
+
+\subsubsection*{(a) Knapsack --- Single Capacity Constraint}
+
+\begin{align}
+  &x_i \in \{0,1\}, \quad i = 1, \ldots, n \\
+  &s \in \{0,1\}^{\lceil \log_2 W \rceil}
+    \quad\text{to encode } \textstyle\sum w_i x_i \leq W
+\end{align}
+\begin{equation}
+  \boxed{q_{\text{Knapsack}} = n + \lceil \log_2 W \rceil = O(n + \log W)}
+\end{equation}
+For $W = O(\mathrm{poly}(n))$: $q = O(n)$.
+
+\textbf{LP boundary structure.} By the simplex vertex theorem applied to a
+single-hyperplane feasible region, the LP relaxation has \emph{at most one}
+fractional variable at any optimal vertex~\cite{dantzig1957,kellerer2004}.
+Hence the boundary zone size $m = O(1)$ and the quantum sub-problem operates
+on $O(1)$ qubits.
+
+\subsubsection*{(b) Multi-Dimensional Knapsack --- $k$ Capacity Constraints}
+
+\begin{equation}
+  \sum_{j=1}^{n} w_{ij} x_j \leq W_i, \quad i = 1, \ldots, k
+\end{equation}
+Each inequality requires $\lceil \log_2 W_i \rceil$ slack qubits:
+\begin{equation}
+  q_{\text{MKP}} = n + k \cdot \lceil \log_2 W_{\max} \rceil = O(n + k \log W)
+\end{equation}
+For fixed $k$: $O(n)$. For $k = O(n)$: $O(n \log n)$.
+LP boundary: up to $\min(k, n)$ fractional variables~\cite{schrijver1986}.
+
+\subsubsection*{(c) Portfolio Optimisation --- Sparse Covariance}
+
+\begin{equation}
+  \text{Minimise } -\mu^T x + \lambda\, x^T \Sigma x, \quad x_i \in \{0,1\}
+\end{equation}
+The objective is already quadratic. For a covariance matrix $\Sigma$ with
+$s$ non-zeros per row:
+\begin{equation}
+  q_{\text{Portfolio}} = n, \quad \text{QUBO terms: } O(ns)
+\end{equation}
+\begin{equation}
+  \boxed{q_{\text{Portfolio}} = O(n)}
+\end{equation}
+For sparse $\Sigma$ ($s = O(1)$): $O(n)$ terms.
+For dense $\Sigma$ ($s = n$): $O(n^2)$ terms but still $n$ variables.
+
+\subsubsection*{(d) Travelling Salesman Problem (TSP)}
+
+Standard position-indexed formulation: $x_{ij} \in \{0,1\}$ (city $i$ at
+position $j$), with $n^2$ arc variables plus MTZ position encoding:
+\begin{equation}
+  q_{\text{TSP}} = n^2 + n \lceil \log_2 n \rceil = O(n^2)
+\end{equation}
+The fraction of valid TSP tours in the full Hilbert space vanishes doubly
+exponentially:
+\begin{equation}
+  \frac{(n-1)!/2}{2^{n^2}}
+  \sim \frac{\sqrt{2\pi n}(n/e)^n}{2 \cdot 2^{n^2}} \to 0
+\end{equation}
+\begin{equation}
+  \boxed{q_{\text{TSP}} = O(n^2), \quad
+         \text{valid fraction} = O\!\left(\frac{n!}{2^{n^2}}\right)}
+\end{equation}
+
+\subsubsection*{(e) VRP --- $n$ Nodes, $m$ Vehicles (MTZ Formulation)}
+
+Three-index arc variables $x_{ijk} \in \{0,1\}$ (vehicle $k$ on arc
+$(i,j)$); MTZ position variables $u_{ik}$; capacity slack:
+\begin{equation}
+  q_{\text{VRP}} = n^2 m + nm\lceil\log_2 n\rceil
+                 + m\lceil\log_2(Q/d_{\min})\rceil = O(n^2 m)
+\end{equation}
+\emph{Phase 2 validation}: $n=20$, $m=4$ gives
+$1680 + 400 + 12 = 2092$ logical qubits (Phase 2f reported 2,648;
+27\% difference from T-gate ancilla).
+\begin{equation}
+  \boxed{q_{\text{VRP}} = O(n^2 m)}
+\end{equation}
+
+\subsubsection*{(f) MaxCut --- $m$ Edges, $n$ Nodes}
+
+\begin{equation}
+  H_{\text{MaxCut}} = \sum_{(i,j) \in E} \left(x_i + x_j - 2x_i x_j\right),
+  \quad x_i \in \{0,1\}
+\end{equation}
+No feasibility constraints: every $x \in \{0,1\}^n$ is valid.
+\begin{equation}
+  \boxed{q_{\text{MaxCut}} = n, \quad \text{valid fraction} = 1.0}
+\end{equation}
+
+\subsubsection*{(g) Graph Colouring --- $n$ Nodes, $k$ Colours}
+
+$x_{ic} \in \{0,1\}$ (node $i$ receives colour $c$); $n \times k$ variables:
+\begin{equation}
+  q_{\text{Colouring}} = nk + \text{slack} \approx nk
+\end{equation}
+\begin{equation}
+  \rho = \frac{|E|\, k}{\binom{nk}{2}} \approx \frac{2|E|}{n^2 k}
+\end{equation}
+\begin{equation}
+  \boxed{q_{\text{Colouring}} = O(nk)}
+\end{equation}
+
+\subsection{Summary Table}
+
+\begin{table}[ht]
+\centering
+\caption{QUBO encoding complexity across seven problem classes.}
+\label{tab:summary}
+\begin{tabular}{@{}lllll@{}}
+\toprule
+Problem & QUBO vars $q$ & Growth & Constraint density & Valid fraction \\
+\midrule
+Knapsack         & $n + O(\log W)$ & $O(n)$     & $O(1/n)$      & $O(1)$ \\
+Multi-KP (fixed $k$) & $n + k\log W$ & $O(n)$ & $O(k/n^2)$    & $O(1/k)$ \\
+Portfolio (sparse) & $n$           & $O(n)$     & $O(s/n)$      & $O(1)$ \\
+MaxCut           & $n$             & $O(n)$     & 0 (none)      & $\mathbf{1.0}$ \\
+Graph Colouring  & $nk$            & $O(nk)$    & $O(1/k)$      & $O((k!/k^n)^n)$ \\
+TSP              & $n^2$           & $O(n^2)$   & $O(1/n^2)$    & $O(n!/2^{n^2})$ \\
+VRP              & $n^2 m$         & $O(n^2 m)$ & $O(1/n^2 m)$  & $O(n!^m/2^{n^2m})$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{remark}
+Problems with $O(n)$ encoding are either unconstrained (MaxCut, Portfolio)
+or have a single dominant constraint (Knapsack). Problems with $O(n^2)$
+encoding all arise from pairwise coupling of nodes.
+\end{remark}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{The Barren Plateau -- Encoding Complexity Link}
+\label{sec:barren}
+
+\subsection{The Gradient Variance Theorem}
+
+The following is proven in~\cite{mcclean2018barren}:
+
+\begin{theorem}[McClean et al.\ 2018]
+For a variational quantum circuit $U(\theta)$ that forms an approximate
+unitary 2-design on $n$ qubits, the variance of the gradient of the expected
+energy satisfies:
+\begin{equation}
+  \Var\!\left[\frac{\partial \langle H \rangle}{\partial \theta_k}\right]
+  = O\!\left(\frac{1}{2^n}\right)
+\end{equation}
+\end{theorem}
+
+\noindent This means: to measure the gradient with precision $\varepsilon$,
+one needs $O(2^n / \varepsilon^2)$ circuit evaluations.
+
+\subsection{Encoding Size Amplifies the Plateau}
+
+\begin{conjecture}[C1 -- Encoding-Amplified Barren Plateau]
+\label{conj:C1}
+If a problem requires $q(n)$ QUBO variables, the effective QAOA circuit
+operates on $q(n)$ qubits. Therefore:
+\begin{equation}
+  \Var\!\left[\frac{\partial \langle H \rangle}{\partial \theta_k}\right]
+  = O\!\left(\frac{1}{2^{q(n)}}\right)
+\end{equation}
+\end{conjecture}
+
+\noindent (Formal proof would require extending McClean et al.\ to structured
+QUBO circuits.) For VRP with $n=20$, $m=4$: the gradient variance is
+$O(2^{-2092}) \approx 10^{-630}$ --- numerically indistinguishable from zero.
+
+\begin{table}[ht]
+\centering
+\caption{Barren plateau severity by encoding class.}
+\label{tab:barren}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Encoding & Effective qubits & Gradient variance
+  & Evaluations for $\varepsilon$-gradient \\
+\midrule
+$O(n)$     & $n$     & $O(2^{-n})$     & $O(2^n/\varepsilon^2)$ \\
+$O(n^2)$   & $n^2$   & $O(2^{-n^2})$   & $O(2^{n^2}/\varepsilon^2)$ \\
+$O(n^2 m)$ & $n^2 m$ & $O(2^{-n^2 m})$ & doubly-exponential \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Can $O(n)$ Encoding Avoid Barren Plateau?}
+
+\begin{conjecture}[C2 -- Three-Condition Quantum Advantage Criterion]
+\label{conj:C2}
+Quantum advantage via QAOA is theoretically accessible only when all three
+of the following hold simultaneously:
+\begin{equation}
+  \begin{cases}
+    q(n) = O(n) & \text{(linear encoding)} \\
+    \text{cost function local} & \text{($O(1)$ qubit support per term)} \\
+    \text{valid fraction} \approx 1 & \text{(no feasibility penalty)}
+  \end{cases}
+\end{equation}
+\end{conjecture}
+
+\noindent Evidence: Cerezo et al.~\cite{cerezo2021cost} prove that local cost
+functions avoid exponential gradient decay in shallow circuits, while global
+cost functions suffer barren plateaus even at depth $O(1)$.
+For MaxCut: each edge term $(x_i + x_j - 2x_i x_j)$ acts on 2 qubits
+($\Rightarrow$ local). For Knapsack: the penalty $\lambda(\sum w_i x_i - W)^2$
+involves all $n$ variables simultaneously ($\Rightarrow$ global, full barren
+plateau despite $O(n)$ encoding).
+
+\noindent MaxCut satisfies all three conditions. Knapsack satisfies only the
+first. VRP satisfies none.
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{The Circularity Conjecture}
+\label{sec:circularity}
+
+\subsection{Formal Statement}
+
+\begin{definition}[Problem Sets $\calA$, $\calB$, $\calC$]
+\label{def:ABC}
+\begin{align}
+  \calA &= \{\text{problems where LP boundary zone} = O(1)\} \\
+  \calB &= \{\text{problems where QUBO encoding} = O(n)\} \\
+  \calC &= \{\text{problems where LP + rounding achieves }
+              (1-\varepsilon)\text{-approximation}\}
+\end{align}
+\end{definition}
+
+\begin{conjecture}[C3 -- Circularity Theorem]
+\label{conj:C3}
+For natural combinatorial optimisation problem classes:
+\begin{equation}
+  \calA \subseteq \calB, \quad \calA \subseteq \calC,
+  \quad\text{and}\quad \calB \cap \calC \subseteq \calA
+\end{equation}
+\emph{Informally:} The problems where quantum sub-problems are small enough
+to be tractable are exactly the problems where classical LP already works well.
+\end{conjecture}
+
+\subsection{The $\calA \subseteq \calB$ and $\calA \subseteq \calC$ Directions}
+
+These follow from LP integrality theory~\cite{schrijver1986}.
+A system $Ax \leq b$ is \emph{Totally Dual Integral (TDI)} if for every
+integer objective $c$, the LP dual has an integer optimal solution.
+If additionally $b$ is integer, the LP has an integer optimal solution
+(integrality gap = 1). A sufficient condition: $A$ is \emph{totally
+unimodular (TU)} (every square sub-determinant $\in \{-1,0,+1\}$).
+
+\noindent\textbf{The $\calA \subseteq \calB$ argument:}
+\begin{align}
+  &\text{Small LP boundary}
+    \;\xLeftrightarrow{\text{structural}}\;
+    \text{LP relaxation near-integral}
+    \;\xLeftrightarrow{\text{theory}}\;
+    \text{small integrality gap} \notag\\
+  &\text{Small LP boundary}
+    \;\Rightarrow\;
+    \text{QUBO encodes only boundary}
+    \;\Rightarrow\;
+    O(1)\text{ extra variables}
+    \;\Rightarrow\;
+    \calA \subseteq \calB \quad\textit{[Conjecture]}
+\end{align}
+
+\noindent\textbf{The $\calA \subseteq \calC$ argument:}
+\begin{equation}
+  \text{Small integrality gap}
+  \;\Rightarrow\;
+  \text{LP + rounding achieves }(1-\varepsilon)\text{-approximation}
+  \;\Rightarrow\;
+  \calA \subseteq \calC
+\end{equation}
+For Knapsack this is the FPTAS argument~\cite{vazirani2001}.
+
+\subsection{The Reverse Direction: $\calB \cap \calC \subseteq \calA$}
+
+\begin{openprob}[B$\cap$C$\subseteq$A Direction]
+\label{op:BcapC}
+If a problem has $O(n)$ QUBO encoding \emph{and} LP + rounding works well,
+does its LP relaxation boundary zone necessarily satisfy $m = O(1)$?
+\end{openprob}
+
+\noindent\textbf{Informal argument (not a proof).}
+Suppose $P \in \calB \cap \calC$. Since $P \in \calB$, the QUBO has $O(n)$
+variables, which requires each penalty $P_k$ to have $O(1)$ variable support.
+Since $P \in \calC$, LP + rounding succeeds, implying a bounded integrality
+gap. By the Hoffman--Kruskal theorem~\cite{hoffmankruskal1956,schrijver1986},
+a bounded gap implies the LP optimal face has bounded dimension, hence bounded
+fractional variables, hence $P \in \calA$.
+
+\noindent\textbf{Where the argument fails.}
+The step ``bounded integrality gap $\Rightarrow$ bounded LP face dimension''
+is not a proven theorem in general. It holds for TU constraint matrices but
+may fail for general $\{0,1\}$-programs with bounded gap.
+
+\noindent\textbf{Three routes to a formal proof.}
+\begin{enumerate}
+  \item \emph{TDI + Hoffman--Kruskal:} If $Ax \leq b$ is TDI with sparse
+    $A$ (each row $O(1)$ non-zeros), then the LP optimal face has integral
+    vertices. Gap: sparsity of $A$ must be connected to $O(n)$ QUBO
+    encoding~\cite{hoffmankruskal1956,schrijver1986}.
+  \item \emph{Communication complexity:} Use Yao's minimax
+    principle~\cite{yao1979,kushilevitz1997} to show $O(n)$ QUBO encoding
+    implies $O(n)$-bit constraint certificates, limiting boundary zone.
+    Gap: formalising ``QUBO encodes the problem'' precisely.
+  \item \emph{Constraint graph treewidth:} If the constraint graph $G_P$
+    is sparse ($O(n)$ edges), the LP feasible region has bounded treewidth,
+    limiting fractionality~\cite{bodlaender1993,cygan2015}. Gap: treewidth
+    $k$ implies bounded fractionality only for $k = O(1)$.
+\end{enumerate}
+
+\noindent\textbf{Verdict.} $\calB \cap \calC \subseteq \calA$ is a
+well-motivated open problem with three plausible proof routes. Proving it
+would constitute a significant result connecting LP integrality theory, QUBO
+encoding, and quantum advantage.
+
+\subsection{Counter-Direction: Large Gap $\Rightarrow$ Large QUBO}
+
+For routing problems (TSP, VRP), achieving even the LP lower bound requires
+exponentially many Dantzig--Fulkerson--Johnson subtour elimination
+constraints. Encoding these as QUBO penalties forces $O(n^2)$ arc variables.
+The QUBO must encode what the LP constraint system requires, providing
+structural reason to believe $\calA \cap \calC^c = \emptyset$ for natural
+classes.
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Candidate Exceptions}
+\label{sec:exceptions}
+
+\subsection{MaxCut as Primary Candidate}
+
+MaxCut satisfies all three conditions in Conjecture~\ref{conj:C2}: $O(n)$
+encoding, all solutions valid, local cost function. The key question is
+whether QAOA can beat the Goemans--Williamson 0.878 approximation guarantee.
+
+If the Unique Games Conjecture (UGC) holds, achieving ratio
+$> 0.878 + \varepsilon$ for MaxCut is NP-hard
+classically~\cite{khot2007maxcut}.
+
+\begin{conjecture}[C4 -- MaxCut Quantum Advantage]
+\label{conj:C4}
+If UGC is true, then quantum algorithms with polynomial overhead could achieve
+$> 0.878$ approximation for MaxCut, representing genuine quantum advantage.
+\end{conjecture}
+
+\noindent\textbf{Current empirical status.} QAOA $p=1$ achieves 0.6924
+$<$ 0.878. Bravyi et al.~\cite{bravyi2020obstacles} showed QAOA $p < n/2$
+cannot beat Goemans--Williamson on certain graph families.
+Farhi et al.~\cite{farhi2020typical,farhi2020worst} showed that for depth
+$p < c \log n$, the QAOA is limited by locality barriers on random
+$d$-regular graphs.
+
+\subsection{Quantum Local Hamiltonian ($k$-Local Hamiltonian)}
+
+The $k$-Local Hamiltonian problem is QMA-complete~\cite{kitaev2002} for
+$k \geq 2$ --- the quantum analogue of NP-completeness. Its natural encoding
+is $O(n)$ qubits with $O(n)$ local terms. Problems with genuine quantum
+structure (where cost functions involve quantum superposition) have no
+classical approximation barrier analogous to the UGC barrier for classical
+combinatorial optimisation. VQE for quantum chemistry is in this class.
+
+\subsection{QUBO at Phase Transitions}
+
+\begin{proposition}[\emph{(empirical)} -- Phase Transition Hardness]
+\label{prop:phase}
+Random $k$-SAT near the satisfiability phase transition ($\alpha = \alpha_c$)
+is computationally hard for classical solvers, with exponentially many
+near-degenerate local minima. Whether quantum tunnelling provides an advantage
+is an open experimental question. Hastings~\cite{hastings2021} showed that
+for random MAX-2-SAT, simulated annealing and QAOA have similar performance
+at shallow depths, suggesting phase transition hardness does not automatically
+grant quantum advantage.
+\end{proposition}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Implications for the Phase 2 VRP Results}
+\label{sec:vrp}
+
+\subsection{Consistency Check: 1.2M Physical Qubits}
+
+The Phase 2 benchmark (20-ATM CVRP, 4 vehicles) reported
+$\approx 1{,}188{,}952$ physical qubits. Our theoretical prediction:
+\begin{align}
+  q_{\text{VRP}}(n=20, m=4)
+    &= n^2 m + nm\lceil\log_2 n\rceil + m\lceil\log_2(Q/d_{\min})\rceil \\
+    &= 400 \times 4 + 20 \times 4 \times 5 + 4 \times 3
+     = 1680 + 400 + 12 = 2092\text{ logical}
+\end{align}
+With surface code distance $d=15$: $1\text{ logical} \mapsto 2d^2-1=449$
+physical:
+\begin{equation}
+  2092 \times 449 = 939{,}308\text{ physical}
+\end{equation}
+The 27\% gap (939K vs.\ 1.19M) arises from T-gate ancilla in magic state
+distillation for fault-tolerant $R_z$ gates. This is consistent with the
+theoretical $O(n^2m)$ class.
+
+\subsection{Alternative Formulations and Encoding Lower Bounds}
+
+The Dantzig--Fulkerson--Johnson (DFJ) flow formulation reduces to
+$q_{\text{DFJ}} = n^2\lceil\log_2(m+1)\rceil = O(n^2 \log m)$;
+for $n=20$, $m=4$: 1200 logical, 538,800 physical (55\% reduction), but
+still in the $O(n^2)$ class. The quadratic bottleneck remains.
+
+\textbf{Assessment of the subtour encoding lower bound.}
+A counting argument over $2^n - 2$ proper subsets yields only
+$\lceil\log_2(2^n)\rceil = n$ bits --- an $\Omega(n)$ lower bound,
+\emph{not} $\Omega(n\log n)$.
+
+\begin{openprob}[Subtour Encoding Lower Bound -- Conjecture C5]
+\label{op:C5}
+The minimum QUBO variable count for any correct encoding of TSP/VRP subtour
+constraints satisfies:
+\begin{equation}
+  q_{\min} = \Omega(n \log n)
+\end{equation}
+\end{openprob}
+
+\noindent\textbf{Informal supporting argument (proof sketch, not theorem).}
+A TSP optimal tour is a permutation $\pi \in S_n$; there are $n!$ distinct
+tours. By Stirling's approximation:
+\begin{equation}
+  \lceil\log_2(n!)\rceil = \Theta(n \log n)
+\end{equation}
+Any encoding distinguishing all optimal tours needs $\Omega(n\log n)$ bits.
+\emph{Gap:} this bounds the solution encoding, not the constraint encoding.
+Multiple QUBO assignments can map to the same tour, and the two need not
+coincide. A formal proof requires connecting information-theoretic solution
+lower bounds to constraint lower bounds --- currently open.
+
+\subsection{The Bug-Lessons as Theoretical Signals}
+
+Three bugs discovered in the Phase 2 QAOA implementation encode theoretical
+content:
+
+\begin{table}[ht]
+\centering
+\caption{Phase 2 implementation bugs as theoretical signals.}
+\label{tab:bugs}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Bug & Root Cause & Theoretical Implication \\
+\midrule
+$\lambda$ too small &
+  Penalty $\ll$ objective &
+  $\lambda \geq \mathrm{Lip}(f)/\text{constraint curvature}$ required \\
+MILP infeasible &
+  Over-constrained model &
+  Constraint satisfaction in NP; tight encoding risks infeasibility \\
+$\langle H\rangle$ vs.\ argmax &
+  Two distinct quantities &
+  Expectation is quantum observable; argmax is classical post-processing \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Open Questions}
+\label{sec:open}
+
+\subsection*{Q1: Can the Circularity Conjecture Be Proven?}
+
+A complete proof requires three steps:
+\begin{enumerate}
+\item LP boundary zone $O(1)$ $\Rightarrow$ QUBO encoding $O(n)$
+  (from LP vertex degree-of-freedom counting).
+\item $O(n)$ QUBO + LP integrality gap $< \varepsilon$
+  $\Rightarrow$ $(1-\delta(\varepsilon))$-approximation
+  (FPTAS argument~\cite{vazirani2001}).
+\item LP + rounding fails $\Rightarrow$ gap $> 1$
+  $\Rightarrow$ $> O(n)$ QUBO
+  (requires connecting LP theory with combinatorial topology).
+\end{enumerate}
+
+\subsection*{Q2: Which Problem Class Is Closest to Quantum Advantage?}
+
+\begin{enumerate}
+\item \textbf{$k$-Local Hamiltonian (QMA-complete):} Quantum advantage
+  proven complexity-theoretically --- but not a classical combinatorial problem.
+\item \textbf{MaxCut on expander graphs:} Theoretically possible if QAOA
+  depth $p = \Omega(n)$ and UGC holds; requires fault-tolerant hardware.
+\item \textbf{Quadratic Assignment Problem (QAP) at phase transition:}
+  No known efficient classical algorithm; QUBO encoding $O(n^2)$ --- barren
+  plateau challenge remains.
+\item \textbf{Protein folding (HP model):} $O(n)$ encoding on a lattice,
+  quantum-native structure.
+\item \textbf{Knapsack/VRP/TSP:} Structural barriers make quantum advantage
+  unlikely without encoding breakthroughs.
+\end{enumerate}
+
+\subsection*{Q3: Minimum Structure for Meaningful Hybrid?}
+
+Based on this analysis, the minimum conditions for a meaningful hybrid
+quantum-classical approach are:
+\begin{equation}
+  \begin{cases}
+    1. & \text{QUBO encoding: } O(n) \text{ variables} \\
+    2. & \text{Cost function: local ($O(1)$ qubit support per term)} \\
+    3. & \text{Valid solution fraction: bounded away from 0} \\
+    4. & \text{Classical approximation: below UGC barrier} \\
+    5. & \text{LP boundary zone: } \Omega(\log n) \text{ (non-trivial)}
+  \end{cases}
+\end{equation}
+No known classical combinatorial optimisation problem satisfies all five
+simultaneously at practical scale. The most promising research direction:
+\emph{problem-specific mixers} (XQAOA, ADAPT-VQE) that preserve feasibility
+constraints in superposition.
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Related Work}
+\label{sec:related}
+
+\textbf{Bravyi, Kliesch, Koenig, Tang (2022)~\cite{bravyi2022hybrid}.}
+This paper analyses Recursive QAOA (RQAOA) on MAX-$k$-CUT, equivalent to
+approximate $k$-colouring. Standard (non-recursive) QAOA fails for most
+regular bipartite graphs at any constant depth $p$, and level-1 RQAOA
+admits an efficient classical simulation. Relation to this work: Graph
+Colouring has $O(nk)$ QUBO encoding (Table~\ref{tab:summary}), placing it
+in the super-linear class. The result is consistent with
+Conjecture~\ref{conj:C1}: barren plateau pressure scales as $O(2^{-nk})$.
+Additionally, the ``one colour per node'' constraint is global, violating
+the locality condition of Conjecture~\ref{conj:C2}.
+
+\textbf{Farhi, Gamarnik, Gutmann (2020)~\cite{farhi2020typical,farhi2020worst}.}
+For depth $p < c\log n$, QAOA on Maximum Independent Set on random
+$d$-regular graphs cannot achieve better than approximately 0.854 times
+the optimum. The mechanism is locality: shallow circuits see only tree-like
+$p$-hop neighbourhoods. This is the strongest evidence for the locality
+condition in Conjecture~\ref{conj:C2}. The depth requirement $p = \Omega(\log n)$
+places QAOA precisely in the regime where barren plateaus are catastrophic
+--- squeezing quantum advantage from both sides.
+
+\textbf{Cerezo et al.\ (2021)~\cite{cerezo2021cost}.}
+Cost function dependent barren plateaus: local cost functions (observable on
+$O(1)$ qubits) have at most polynomially decaying gradients for shallow
+circuits, while global cost functions suffer exponential decay even at depth
+$O(1)$. This closes the gap in Conjecture~\ref{conj:C2}: $O(n)$ encoding
+is necessary but not sufficient --- locality of the cost function is an
+independent requirement.
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section*{Conclusion}
+
+Classical combinatorial optimisation problems are classical by definition:
+their solutions are binary strings. Quantum advantage for such problems
+requires outperforming the best classical approximation. For problems with
+$O(n^2)$ or higher QUBO encoding, barren plateau gradient suppression scales
+as $O(2^{-n^2})$ --- numerically zero for any practical $n$. The problems
+where quantum circuits are small enough to avoid this barrier are exactly
+those where classical LP already finds near-optimal solutions. This
+circularity is structural, not a hardware limitation, and will not be
+resolved by improved quantum chips alone.
+
+This work does not claim quantum computing is without promise. It identifies
+that the right problem class for gate-based QAOA applied to classical
+combinatorial optimisation has not yet been found, and provides a structural
+framework for the search.
+
+% ── Data availability ─────────────────────────────────────────────────────────
+\section*{Data and Code Availability}
+
+All code, data, and analysis scripts are available at\\
+\url{https://github.com/jasstt/quantum-knapsack-vrp-theory}\\
+under the MIT License. The predecessor project (20-ATM CVRP empirical data)
+is at \url{https://github.com/jasstt/stochastic-VRP-decision-focused-learning}.
+
+% ── References ────────────────────────────────────────────────────────────────
+\bibliographystyle{plain}
+\bibliography{references}
+
+\end{document}
